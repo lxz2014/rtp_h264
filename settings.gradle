@@ -1,0 +1,5 @@
+include ':app'
+rootProject.name='capture_h284'
+include ':lib_log4a'
+
+project(':lib_log4a').projectDir  = new File('../lib_log4a')
