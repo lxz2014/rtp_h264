@@ -89,11 +89,13 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
 
         int bitrate = screenHeight * screenWidth * 3;//编码比特率，
         mediaProjectionManager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
-        avcEncoder = new ScreenAvcEncoder(screenWidth, screenHeight , 15, bitrate);
+        avcEncoder = new ScreenAvcEncoder(screenWidth, screenHeight , Config.fps, bitrate);
         h264 = new byte[screenWidth * screenHeight * 3];
 
         editIp.setText(Config.getIp());
         showModel();
+
+        Config.getSupportColorFormat();
     }
 
     private void showModel() {

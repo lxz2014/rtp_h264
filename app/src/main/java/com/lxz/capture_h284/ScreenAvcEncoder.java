@@ -8,6 +8,7 @@ import android.util.Log;
 import android.view.Surface;
 
 import com.iflytek.log.Lg;
+import com.lxz.capture_h284.utils.CommUtils;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -46,7 +47,12 @@ public class ScreenAvcEncoder {
         mediaFormat.setInteger(MediaFormat.KEY_FRAME_RATE, framerate);
         //mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar);
         mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
-        mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);//关键帧间隔时间 单位s
+        mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, Config.KEY_I_FRAME_INTERVAL);//关键帧间隔时间 单位s
+        byte[] header_sps = {0, 0, 0, 1, 67, 66, 0, 42, (byte) 149, (byte) 168, 30, 0, (byte) 137, (byte) 249, 102, (byte) 224, 32, 32, 32, 64};
+        byte[] header_pps = {0, 0, 0, 1, 68, (byte) 206, 60, (byte) 128, 0, 0, 0, 1, 6, (byte) 229, 1, (byte) 151, (byte) 128};
+//        mediaFormat.setByteBuffer("csd-0", ByteBuffer.wrap(header_sps));
+//        mediaFormat.setByteBuffer("csd-1", ByteBuffer.wrap(header_pps));
+
         mediaCodec.configure(mediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
         this.surface = mediaCodec.createInputSurface();
         mediaCodec.start();
@@ -66,8 +72,9 @@ public class ScreenAvcEncoder {
         }
     }
 
+    private byte[] pps ;
+    private int keyCount = 0;
     public int getOutputBuffer(byte[] output) {
-        Log.v("xmc", "getOutputBuffer");
         int pos = 0;
         MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
         int outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
@@ -76,25 +83,10 @@ public class ScreenAvcEncoder {
             ByteBuffer outputBuffer = mediaCodec.getOutputBuffer(outputBufferIndex);
             byte[] outData = new byte[bufferInfo.size];
             outputBuffer.get(outData);
-
-            if (m_info != null) {
-                System.arraycopy(outData, 0, output, pos, outData.length);
-                pos += outData.length;
-
-            } else {//保存pps sps 只有开始时 第一个帧里有， 保存起来后面用
-                ByteBuffer spsPpsBuffer = ByteBuffer.wrap(outData);
-
-                if (spsPpsBuffer.getInt() == 0x00000001) {
-                    m_info = new byte[outData.length];
-                    System.arraycopy(outData, 0, m_info, 0, outData.length);
-                } else {
-                    return -1;
-                }
-            }
+            System.arraycopy(outData, 0, output, pos, outData.length);
+            pos += outData.length;
             if ((output[4] & 0x1F) == 5) {//key frame 编码器生成关键帧时只有 00 00 00 01 65 没有pps sps， 要加上
-                System.arraycopy(m_info, 0, output, 0, m_info.length);
-                System.arraycopy(outData, 0, output, m_info.length, outData.length);
-                pos += m_info.length;
+                Lg.e(TAG, "IDR 帧");
             }
             mediaCodec.releaseOutputBuffer(outputBufferIndex, false);
             outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
@@ -103,6 +95,22 @@ public class ScreenAvcEncoder {
         Log.v("xmc", "getOutputBuffer+pos:" + pos);
         return pos;
     }
+
+//     if ((h264Data[4] & 0x1f) == 7) {
+//        pps = new byte[h264Data.length];
+//        System.arraycopy(h264Data, 0, pps, 0, h264Data.length);
+//    }
+//
+//            if ((h264Data[4] & 0x1f) == 5) {
+//        keyCount++;
+//        if (keyCount >= 2 && pps != null) {
+//            byte[] lenPpsByte = CommUtils.int2bytes(pps.length);
+//            Lg.e(TAG, "write pps lenPpsByte %d -> int2byte %d", pps.length, CommUtils.bytes2int(lenPpsByte));
+//            sink.write(lenPpsByte);
+//            sink.write(pps);
+//            sink.flush();
+//        }
+//    }
 
 
     long pts = 0;

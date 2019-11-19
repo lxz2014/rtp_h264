@@ -7,7 +7,6 @@ import com.lxz.capture_h284.utils.CommUtils;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import okio.BufferedSink;
@@ -15,29 +14,32 @@ import okio.BufferedSource;
 import okio.ByteString;
 import okio.Okio;
 
-public class FileH264Stream extends BaseStream{
+public class FileH264Stream2 extends BaseStream{
+    private static final String TAG = "OkIoH264Stream";
     private static final int SIZE = 1024;
     private File saveFile;
     private BufferedSource source;
     private BufferedSink sink;
     private IRecvFrameCallback callback;
     private AtomicBoolean isRecvEnd = new AtomicBoolean(true);
-    byte[] startCode = new byte[]{(byte)0x0, (byte)0x0, (byte)0x0, (byte)0x1};
+    private ByteString startCode = ByteString.of((byte)0x0, (byte)0x0, (byte)0x0, (byte)0x1);
 
-    public FileH264Stream() {
+    public FileH264Stream2() {
         saveFile = Config.getSaveFile();
     }
 
     private byte[] readNextFrame() {
         try {
-            byte [] size = new byte[4];
-            int ret = source.read(size, 0, 4);
-            if (ret > 0) {
-                int len = CommUtils.bytes2int(size);
-                Lg.i(TAG, "read len " + len);
-                byte[] data = source.readByteArray(len);
-                log(data);
-                return data;
+            long startIndex = source.indexOf(startCode);
+            long endIndex  = source.indexOf(startCode, startIndex + 1);
+            if (startIndex >= 0 && endIndex > 0) {
+                long len = endIndex - startIndex;
+                Lg.i(TAG, "startindex %d, endindex :%d, len:%d", startIndex, endIndex, len);
+                return source.readByteArray(len);
+            }
+            else if (startIndex >= 0 && endIndex < 0) {
+                Lg.i(TAG, "2 startindex %d, endindex :%d", startIndex, endIndex);
+                return source.readByteArray();
             }
         } catch (IOException e) {
             Lg.e(TAG, "read next frame error " + e);
@@ -95,30 +97,13 @@ public class FileH264Stream extends BaseStream{
                 e.printStackTrace();
             }
         }
-        //Lg.i(TAG, "frame len =" + h264Data.length);
+        Lg.i(TAG, "frame len =" + h264Data.length);
         try {
-            int startIndex = 0;
-            int endIndex = 0;
-            int countFrame = 0;
-            while (true) {
-                startIndex = KMP(h264Data, startCode, startIndex);
-                endIndex   = KMP(h264Data, startCode, startIndex + 1);
-                endIndex = endIndex == -1 ? h264Data.length - 1 : endIndex;
-                countFrame++;
-                int len = endIndex - startIndex;
-                byte[] lenByte = CommUtils.int2bytes( len);
-                Lg.i(TAG, "sindex:%d, eindex:%d, len %d , frame:%d", startIndex, endIndex, len, countFrame);
-                sink.write(lenByte);
-                sink.write(h264Data, startIndex, len);
-                sink.flush();
-                if (endIndex == h264Data.length -1) {
-                    break;
-                }
-                startIndex++;
-            }
+            CommUtils.logFrame(h264Data);
+            sink.write(h264Data);
+            sink.flush();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
-
 }
