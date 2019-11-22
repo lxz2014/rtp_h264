@@ -45,14 +45,8 @@ public class ScreenAvcEncoder {
         MediaFormat mediaFormat = MediaFormat.createVideoFormat(MIME_TYPE, width, height);
         mediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
         mediaFormat.setInteger(MediaFormat.KEY_FRAME_RATE, framerate);
-        //mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar);
         mediaFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
         mediaFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, Config.KEY_I_FRAME_INTERVAL);//关键帧间隔时间 单位s
-        byte[] header_sps = {0, 0, 0, 1, 67, 66, 0, 42, (byte) 149, (byte) 168, 30, 0, (byte) 137, (byte) 249, 102, (byte) 224, 32, 32, 32, 64};
-        byte[] header_pps = {0, 0, 0, 1, 68, (byte) 206, 60, (byte) 128, 0, 0, 0, 1, 6, (byte) 229, 1, (byte) 151, (byte) 128};
-//        mediaFormat.setByteBuffer("csd-0", ByteBuffer.wrap(header_sps));
-//        mediaFormat.setByteBuffer("csd-1", ByteBuffer.wrap(header_pps));
-
         mediaCodec.configure(mediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
         this.surface = mediaCodec.createInputSurface();
         mediaCodec.start();
@@ -72,46 +66,34 @@ public class ScreenAvcEncoder {
         }
     }
 
-    private byte[] pps ;
-    private int keyCount = 0;
-    public int getOutputBuffer(byte[] output) {
-        int pos = 0;
-        MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
-        int outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
-
-        while (outputBufferIndex >= 0) {
-            ByteBuffer outputBuffer = mediaCodec.getOutputBuffer(outputBufferIndex);
-            byte[] outData = new byte[bufferInfo.size];
-            outputBuffer.get(outData);
-            System.arraycopy(outData, 0, output, pos, outData.length);
-            pos += outData.length;
-            if ((output[4] & 0x1F) == 5) {//key frame 编码器生成关键帧时只有 00 00 00 01 65 没有pps sps， 要加上
-                Lg.e(TAG, "IDR 帧");
-            }
-            mediaCodec.releaseOutputBuffer(outputBufferIndex, false);
-            outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
+    public void queueInputBuffer(byte [] input) {
+        int inputBufferIndex = mediaCodec.dequeueInputBuffer(-1);
+        if (inputBufferIndex >= 0) {
+            ByteBuffer inputBuffer = mediaCodec.getInputBuffer(inputBufferIndex);
+            inputBuffer.clear();
+            inputBuffer.put(input);
+            mediaCodec.queueInputBuffer(inputBufferIndex, 0, input.length, System.nanoTime(), 0);
+            generateIndex += 1;
         }
-
-        Log.v("xmc", "getOutputBuffer+pos:" + pos);
-        return pos;
     }
 
-//     if ((h264Data[4] & 0x1f) == 7) {
-//        pps = new byte[h264Data.length];
-//        System.arraycopy(h264Data, 0, pps, 0, h264Data.length);
-//    }
-//
-//            if ((h264Data[4] & 0x1f) == 5) {
-//        keyCount++;
-//        if (keyCount >= 2 && pps != null) {
-//            byte[] lenPpsByte = CommUtils.int2bytes(pps.length);
-//            Lg.e(TAG, "write pps lenPpsByte %d -> int2byte %d", pps.length, CommUtils.bytes2int(lenPpsByte));
-//            sink.write(lenPpsByte);
-//            sink.write(pps);
-//            sink.flush();
-//        }
-//    }
+    public OutputBufferInfo dequeueOutputBuffer() {
+        MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
+        int outputBufferIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
+        OutputBufferInfo info = new OutputBufferInfo(outputBufferIndex, bufferInfo.size);
+        return info;
+    }
 
+    public byte[] getOutputBuffer(int size, int outputBufferIndex) {
+        ByteBuffer outputBuffer = mediaCodec.getOutputBuffer(outputBufferIndex);
+        byte[] output = new byte[size];
+        outputBuffer.get(output);
+        if ((output[4] & 0x1F) == 5) {//key frame 编码器生成关键帧时只有 00 00 00 01 65 没有pps sps， 要加上
+            Lg.e(TAG, "IDR 帧");
+        }
+        mediaCodec.releaseOutputBuffer(outputBufferIndex, false);
+        return output;
+    }
 
     long pts = 0;
     long generateIndex = 0;
@@ -196,74 +178,5 @@ public class ScreenAvcEncoder {
         return System.nanoTime();
     }
 
-    private void NV21ToNV12(byte[] nv21, byte[] nv12, int width, int height) {
-        if (nv21 == null || nv12 == null) return;
-        int framesize = width * height;
-        int i = 0, j = 0;
-        System.arraycopy(nv21, 0, nv12, 0, framesize);
-        for (j = 0; j < framesize / 2; j += 2) {
-            nv12[framesize + j] = nv21[j + framesize + 1];
-            nv12[framesize + j + 1] = nv21[j + framesize];
-        }
-    }
-
-    //网友提供的，如果swapYV12toI420方法颜色不对可以试下这个方法，不同机型有不同的转码方式
-    private void NV21toI420SemiPlanar(byte[] nv21bytes, byte[] i420bytes, int width, int height) {
-        Log.v("xmc", "NV21toI420SemiPlanar:::" + width + "+" + height);
-        final int iSize = width * height;
-        System.arraycopy(nv21bytes, 0, i420bytes, 0, iSize);
-
-        for (int iIndex = 0; iIndex < iSize / 2; iIndex += 2) {
-            i420bytes[iSize + iIndex / 2 + iSize / 4] = nv21bytes[iSize + iIndex]; // U
-            i420bytes[iSize + iIndex / 2] = nv21bytes[iSize + iIndex + 1]; // V
-        }
-    }
-
-    //yv12 转 yuv420p  yvu -> yuv
-    private void swapYV12toI420(byte[] yv12bytes, byte[] i420bytes, int width, int height) {
-        Log.v("xmc", "swapYV12toI420:::" + width + "+" + height);
-        Log.v("xmc", "swapYV12toI420:::" + yv12bytes.length + "+" + i420bytes.length + "+" + width * height);
-        System.arraycopy(yv12bytes, 0, i420bytes, 0, width * height);
-        System.arraycopy(yv12bytes, width * height + width * height / 4, i420bytes, width * height, width * height / 4);
-        System.arraycopy(yv12bytes, width * height, i420bytes, width * height + width * height / 4, width * height / 4);
-    }
-
-
-    /**
-     * RGB图片转YUV420数据
-     * 宽、高不能为奇数
-     * 这个方法太耗时了，需要优化。用C实现（C实现的结果并没有JAVA的性能好。奇怪。）
-     *
-     * @param width  宽
-     * @param height 高
-     * @return
-     */
-    public void rgb2YCbCr420(byte[] byteArgb, byte[] yuv, int width, int height) {
-        Log.e("xmc", "encodeYUV420SP start");
-        int len = width * height;
-        int r, g, b, y, u, v, c;
-        for (int i = 0; i < height; i++) {
-            for (int j = 0; j < width; j++) {
-                c = (i * width + j) * 4;
-                r = byteArgb[c] & 0xFF;
-                g = byteArgb[c + 1] & 0xFF;
-                b = byteArgb[c + 2] & 0xFF;
-                //   int a = byteArgb[(i * width + j) * 4 + 3]&0xFF;
-                //套用公式
-                y = ((66 * r + 129 * g + 25 * b + 128) >> 8) + 16;
-                u = ((-38 * r - 74 * g + 112 * b + 128) >> 8) + 128;
-                v = ((112 * r - 94 * g - 18 * b + 128) >> 8) + 128;
-                //调整
-                y = y < 16 ? 16 : (y > 255 ? 255 : y);
-                u = u < 0 ? 0 : (u > 255 ? 255 : u);
-                v = v < 0 ? 0 : (v > 255 ? 255 : v);
-                //赋值
-                yuv[i * width + j] = (byte) y;
-                yuv[len + (i >> 1) * width + (j & ~1) + 0] = (byte) u;
-                yuv[len + +(i >> 1) * width + (j & ~1) + 1] = (byte) v;
-            }
-        }
-        Log.e("xmc", "encodeYUV420SP end");
-    }
 }
 

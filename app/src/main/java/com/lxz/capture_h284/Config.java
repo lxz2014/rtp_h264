@@ -13,7 +13,7 @@ import java.util.Arrays;
 
 public class Config {
     public static final int DATA_LEN = 1480;
-    public static final int KEY_I_FRAME_INTERVAL = 5;
+    public static final int KEY_I_FRAME_INTERVAL = 1;
     private static final String EXTRA_IP = "Config";
     public static int fps = 15;
 

@@ -48,14 +48,14 @@ public class RTPSession {
 	  * Debug output is written to System.out</br>
 	  * Debug level for RTP related things.
 	  */
-	 final static public int rtpDebugLevel = 0;
+	 final static public int rtpDebugLevel = 20;
 	 /**
 	  * The debug level is final to avoid compilation of if-statements.</br>
 	  * 0 provides no debugging information, 20 provides everything </br>
 	  * Debug output is written to System.out</br>
 	  * Debug level for RTCP related things.
 	  */
-	 final static public int rtcpDebugLevel = 0;
+	 final static public int rtcpDebugLevel = 20;
 	 
 	 /** RTP unicast socket */
 	 protected DatagramSocket rtpSock = null;
@@ -334,7 +334,6 @@ public class RTPSession {
 
 			 if(this.mcSession) {
 				 DatagramPacket packet = null;
-
 
 				 try {
 					 packet = new DatagramPacket(pktBytes,pktBytes.length,this.mcGroup,this.rtpMCSock.getPort());

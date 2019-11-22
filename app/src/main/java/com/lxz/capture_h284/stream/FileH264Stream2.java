@@ -15,7 +15,7 @@ import okio.ByteString;
 import okio.Okio;
 
 public class FileH264Stream2 extends BaseStream{
-    private static final String TAG = "OkIoH264Stream";
+    private static final String TAG = "FileH264Stream2";
     private static final int SIZE = 1024;
     private File saveFile;
     private BufferedSource source;
@@ -99,7 +99,7 @@ public class FileH264Stream2 extends BaseStream{
         }
         Lg.i(TAG, "frame len =" + h264Data.length);
         try {
-            CommUtils.logFrame(h264Data);
+            logFrame(h264Data);
             sink.write(h264Data);
             sink.flush();
         } catch (IOException e) {

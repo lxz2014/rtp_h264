@@ -31,7 +31,7 @@ public class PlayMainActivity extends BaseActivity {
     private int fps = 15;//每秒帧率
     private int bitrate = width * height * 3;//编码比特率，
     private MediaCodec decode;
-    private long timeoutUs = 10000;
+    private long timeoutUs = 100;
     private IH264Stream debug;
     private long outputBufferCount = 0;
     private long frameCount = 0;
@@ -82,11 +82,8 @@ public class PlayMainActivity extends BaseActivity {
         Lg.d(TAG, "");
         final MediaFormat format = MediaFormat.createVideoFormat(MIME_TYPE, width, height);
         format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
-        //format.setInteger(MediaFormat.KEY_FRAME_RATE, Config.fps);
+        format.setInteger(MediaFormat.KEY_FRAME_RATE, Config.fps);
         format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, Config.KEY_I_FRAME_INTERVAL);
-        format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 8 * 1024);
-//        format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar);
-        //format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_Format25bitARGB1888);
         decode.configure(format, holder.getSurface(), null, 0);
         decode.start();
     }
@@ -95,19 +92,21 @@ public class PlayMainActivity extends BaseActivity {
         final int sleep = 1000 / fps;
         debug.startRecvFrame(new IRecvFrameCallback() {
             private long startPlayTime = 0;
+            private boolean isFirst;
             @Override
             public void onFrame(byte[] frame) {
                 if (decode == null) {
                     return;
                 }
 
+                long t1 = System.currentTimeMillis();
                 if (frame != null ) {
-                    long t1 = System.currentTimeMillis();
                     offerDecoder(frame, frame.length);
-                    long t2 = System.currentTimeMillis();
                     //Lg.i(TAG, "frame time: %d", (t2 - t1));
                 }
-                CommUtils.sleep(sleep );
+                long t2 = System.currentTimeMillis();
+
+                CommUtils.sleep((int) (sleep - (t2 - t1)));
             }
 
             @Override
@@ -115,6 +114,7 @@ public class PlayMainActivity extends BaseActivity {
                 outputBufferCount = 0;
                 frameCount = 0;
                 startPlayTime = System.currentTimeMillis();
+                decode.flush();
             }
 
             @Override
@@ -151,15 +151,7 @@ public class PlayMainActivity extends BaseActivity {
                         , logBufferIInfo(bufferInfo));
                 decode.releaseOutputBuffer(outputBufferIndex, true);
 
-                long t1 = System.currentTimeMillis();
                 outputBufferIndex = decode.dequeueOutputBuffer(bufferInfo, timeoutUs);
-                long t2 = System.currentTimeMillis();
-                Lg.i(TAG, "dequeueOutputBuffer time %d", (t2 - t1));
-            }
-            if (outputBufferIndex < 0) {
-                Lg.i(TAG, "outputBufferIndex %d , count:%d, frame:%d, bufferInfo : %s"
-                        , outputBufferIndex, outputBufferCount, frameCount
-                        , logBufferIInfo(bufferInfo));
             }
         } catch (Throwable t) {
             t.printStackTrace();
