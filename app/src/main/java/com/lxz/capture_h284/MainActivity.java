@@ -1,10 +1,6 @@
 package com.lxz.capture_h284;
 
 import androidx.annotation.Nullable;
-import okio.Buffer;
-import okio.BufferedSink;
-import okio.BufferedSource;
-import okio.Okio;
 import rx.functions.Action1;
 
 import android.Manifest;
@@ -14,12 +10,10 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
-import android.media.MediaExtractor;
-import android.media.MediaFormat;
+import android.media.ImageReader;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.util.DisplayMetrics;
 import android.view.View;
@@ -29,16 +23,14 @@ import android.widget.TextView;
 
 import com.iflytek.log.Lg;
 import com.lxz.capture_h284.comm.BaseActivity;
+import com.lxz.capture_h284.encode.IEncoder;
+import com.lxz.capture_h284.encode.ImageReaderEncoder;
+import com.lxz.capture_h284.encode.SurfaceEncoder;
 import com.lxz.capture_h284.stream.H264StreamFactory;
 import com.lxz.capture_h284.stream.IH264Stream;
 import com.lxz.capture_h284.utils.CommUtils;
 import com.lxz.capture_h284.utils.SpUtils;
 import com.tbruyelle.rxpermissions.RxPermissions;
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.Arrays;
 
 public class MainActivity extends BaseActivity implements View.OnClickListener {
     private static final int STATE_START = 1;
@@ -57,14 +49,15 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
 
     private int state = STATE_STOP;
     private VirtualDisplay virtualDisplay;
-    private int screenWidth = 1920;
-    private int screenHeight = 1080;
-    private ScreenAvcEncoder avcEncoder;
-    //private byte[] h264;
-    private IH264Stream debugStream;
+    private int screenWidth = 1280;
+    private int screenHeight = 720;
     private int dpi;
     private TextView choose;
-    private int bitrate;
+    private ImageReader imageReader;
+    private TextView textView;
+    private boolean isStart = false;
+    private Thread timeThread;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -94,17 +87,11 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
         DisplayMetrics dm = new DisplayMetrics();
         getWindowManager().getDefaultDisplay().getMetrics(dm);
         dpi = dm.densityDpi;
-//        screenHeight = dm.heightPixels / 2;//(int) (Math.max(dm.widthPixels, dm.heightPixels));
-//        screenWidth = dm.widthPixels / 2;//(int) (Math.min(dm.widthPixels, dm.heightPixels));
-
         Lg.d(TAG, "dpi %d, density:%f, w:%d, h:%d" , dpi, dm.density,screenWidth , screenHeight);
 
-        bitrate = screenHeight * screenWidth * 3;//编码比特率，
         mediaProjectionManager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
         editIp.setText(Config.getIp());
         showModel();
-        getMediaFormatFrom();
-
         textView = findViewById(R.id.txt_time);
         textView.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -114,10 +101,7 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
             }
         });
     }
-    private TextView textView;
 
-    private boolean isStart = false;
-    private Thread timeThread;
     private void startTime() {
         if (timeThread != null) {
             timeThread.interrupt();
@@ -159,7 +143,6 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
                 break;
             case R.id.stop:
                 stopCapture();
-                test();
                 break;
             case R.id.show:
                 Intent it = new Intent(this, PlayMainActivity.class);
@@ -175,45 +158,6 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
                 choose.setText(H264StreamFactory.model .name());
                 break;
         }
-    }
-
-    private void test() {
-//        Buffer src = new Buffer();
-//        Buffer dst = new Buffer();
-//
-//        byte [] d1 = new byte[20];
-//        byte [] d2 = new byte[20];
-//        Arrays.fill(d1, (byte)1);
-//        Arrays.fill(d2, (byte)2);
-//
-//        src.write(d1);
-//        dst.write(d2);
-//
-//        dst.write(src, 12);
-
-        byte [] mm = new byte[8192 * 2];
-        Arrays.fill(mm, (byte)55);
-        Buffer max = new Buffer();
-        max.write(mm);
-        Lg.d(TAG, "XXXX");
-    }
-
-    private void getMediaFormatFrom() {
-        MediaExtractor extractor = new MediaExtractor();
-        try {
-            File file=new File(Environment.getExternalStorageDirectory(),"save.h264");
-            Lg.d(TAG,file.getAbsolutePath());
-            extractor.setDataSource(file.getAbsolutePath());
-        } catch (IOException e) {
-            Lg.e(TAG, "getMediaFormatFrom error " + e);
-        }
-        int numTracks = extractor.getTrackCount();
-        for (int i = 0; i < numTracks; ++i) {
-            MediaFormat format = extractor.getTrackFormat(i);
-            String mime = format.getString(MediaFormat.KEY_MIME);
-            Lg.d(TAG, "mime="+mime);
-        }
-        extractor.release();
     }
 
     private void stopCapture() {
@@ -234,15 +178,17 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
         }
     }
 
+    private IEncoder encoder;
     private void exeRecord() {
-        avcEncoder = new ScreenAvcEncoder(screenWidth, screenHeight , Config.fps, bitrate);
+        IH264Stream outputStream = H264StreamFactory.createH264Stream();
+        encoder = new ImageReaderEncoder(outputStream, screenWidth, screenHeight);//new SurfaceEncoder(debugStream, screenWidth, screenHeight);
         this.virtualDisplay = this.mediaProjection.createVirtualDisplay(
                 "Recording Display"
                 , screenWidth
                 , screenHeight
                 , 1
                 , DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
-                , avcEncoder.getSurface()
+                , encoder.getSurface()
                 , new VirtualDisplay.Callback() {
                     @Override
                     public void onPaused() {
@@ -262,44 +208,25 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
                 new Handler());
         //
         new Thread(new Runnable() {
-            private byte[] pps = null;
             @Override
             public void run() {
-                debugStream = H264StreamFactory.createH264Stream();
+                int fpsTime = 1000 / Config.encodeFps;
                 while (virtualDisplay != null) {
-                    OutputBufferInfo outputInfo = avcEncoder.dequeueOutputBuffer();
-                    while (outputInfo.outputBufferIndex >= 0) {
-                        byte[] h264Data = avcEncoder.getOutputBuffer(outputInfo.size, outputInfo.outputBufferIndex);
-                        if (h264Data != null) {
-                            //int nextIndex = CommUtils.KMP(h264Data, new byte[]{0,0,0,1}, 1);
-                            Lg.i(TAG, "getOutputBuffer frame len %d, next", h264Data.length);
-                            if (frameHead(h264Data) == 7 && pps == null) {
-                                Lg.e(TAG, "pps frame..");
-                                pps = new byte[h264Data.length];
-                                System.arraycopy(h264Data, 0, pps, 0, h264Data.length);
-                            }
-                            else if (frameHead(h264Data) == 5 && pps != null) {
-                                Lg.e(TAG, "IDR frame, write pps");
-                                debugStream.writeFrame(pps);
-                            }
-                            debugStream.writeFrame(h264Data);
-                        }
-                        outputInfo = avcEncoder.dequeueOutputBuffer();
-                    }
-                    CommUtils.sleep(50);
+                    long t1 = System.currentTimeMillis();
+                    encoder.outputEncodeData();
+                    long t2 = System.currentTimeMillis();
+                    long dt = t2 - t1;
+                    Lg.i(TAG, "time dt %d", dt);
+                    CommUtils.sleep(fpsTime <= dt ? 0 : (int) (fpsTime - dt));
                 }
+
                 showToast("停止录制");
                 Lg.e(TAG, "停止录制");
-                if (avcEncoder != null) {
-                    avcEncoder.close();
+                if (encoder != null) {
+                    encoder.release();
                 }
-                pps = null;
             }
         }).start();
-    }
-
-    private int frameHead(byte[] h264Data) {
-        return h264Data[4] & 0x1f;
     }
 
     @Override
@@ -312,7 +239,7 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
                     exeRecord();
                 }
             } else {
-                showToast("请求录制被拒绝");
+                showToast("录制权限竟然被拒绝了！！");
             }
         }
     }

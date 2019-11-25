@@ -28,7 +28,7 @@ public class PlayMainActivity extends BaseActivity {
 
     private int width = 720;
     private int height = 1280;
-    private int fps = 15;//每秒帧率
+    private int fps = 25;//每秒帧率
     private int bitrate = width * height * 3;//编码比特率，
     private MediaCodec decode;
     private long timeoutUs = 100;
@@ -82,7 +82,7 @@ public class PlayMainActivity extends BaseActivity {
         Lg.d(TAG, "");
         final MediaFormat format = MediaFormat.createVideoFormat(MIME_TYPE, width, height);
         format.setInteger(MediaFormat.KEY_BIT_RATE, bitrate);
-        format.setInteger(MediaFormat.KEY_FRAME_RATE, Config.fps);
+        format.setInteger(MediaFormat.KEY_FRAME_RATE, Config.encodeFps);
         format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, Config.KEY_I_FRAME_INTERVAL);
         decode.configure(format, holder.getSurface(), null, 0);
         decode.start();
@@ -106,7 +106,9 @@ public class PlayMainActivity extends BaseActivity {
                 }
                 long t2 = System.currentTimeMillis();
 
-                CommUtils.sleep((int) (sleep - (t2 - t1)));
+                long realTime = (int) (sleep - (t2 - t1));
+                Lg.i(TAG, "frame sleep time: %d, decodetime:%d", realTime, (t2 - t1));
+                CommUtils.sleep((int) realTime);
             }
 
             @Override
@@ -146,9 +148,9 @@ public class PlayMainActivity extends BaseActivity {
             int outputBufferIndex = decode.dequeueOutputBuffer(bufferInfo, timeoutUs);
             while (outputBufferIndex >= 0) {
                 outputBufferCount++;
-                Lg.i(TAG, "outputBufferIndex %d , count:%d, frame:%d, bufferInfo : %s"
-                        , outputBufferIndex, outputBufferCount, frameCount
-                        , logBufferIInfo(bufferInfo));
+//                Lg.i(TAG, "outputBufferIndex %d , count:%d, frame:%d, bufferInfo : %s"
+//                        , outputBufferIndex, outputBufferCount, frameCount
+//                        , logBufferIInfo(bufferInfo));
                 decode.releaseOutputBuffer(outputBufferIndex, true);
 
                 outputBufferIndex = decode.dequeueOutputBuffer(bufferInfo, timeoutUs);

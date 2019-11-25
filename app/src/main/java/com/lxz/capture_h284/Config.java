@@ -15,7 +15,8 @@ public class Config {
     public static final int DATA_LEN = 1480;
     public static final int KEY_I_FRAME_INTERVAL = 1;
     private static final String EXTRA_IP = "Config";
-    public static int fps = 15;
+    public static int encodeFps = 15;
+    public static int decodeFps = 25;
 
     public static String getIp() {
         String ip = SpUtils.getValue(EXTRA_IP, "192.168.1.115");
