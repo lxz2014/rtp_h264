@@ -8,7 +8,7 @@ public class H264StreamFactory {
     public static Model model = Model.file;
     public static IH264Stream createH264Stream() {
         if (model.equals(Model.file)) {
-            return new FileH264Stream2();
+            return new FileH264Stream();
         }
         else {
             return new RtpH264Stream();
