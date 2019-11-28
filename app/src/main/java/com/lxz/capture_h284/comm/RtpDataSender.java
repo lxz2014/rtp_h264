@@ -1,4 +1,4 @@
-package com.lxz.capture_h284.stream;
+package com.lxz.capture_h284.comm;
 
 import android.os.Handler;
 import android.os.HandlerThread;

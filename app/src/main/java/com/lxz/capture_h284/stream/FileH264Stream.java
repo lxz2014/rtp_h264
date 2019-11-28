@@ -25,7 +25,7 @@ public class FileH264Stream extends BaseStream{
     private AtomicBoolean isRecvEnd = new AtomicBoolean(true);
     private byte[] startCode = new byte[]{(byte)0x0, (byte)0x0, (byte)0x0, (byte)0x1};
 
-    private BufferedSink lenSink ;
+    //private BufferedSink lenSink ;
     private String lenFile;
 
     public FileH264Stream() {
@@ -40,7 +40,7 @@ public class FileH264Stream extends BaseStream{
             int len = CommUtils.bytes2int(size);
             byte[] data = source.readByteArray(len);
             //Lg.i(TAG, "read len %d, data.len:%d" , len, data.length);
-            logFrame(data);
+            //logFrame(data);
             return data;
         } catch (IOException e) {
             Lg.e(TAG, "read next frame error " + e);
@@ -99,20 +99,20 @@ public class FileH264Stream extends BaseStream{
                     Lg.e(TAG, "delete old file ");
                 }
                 sink = Okio.buffer(Okio.sink(saveFile));
-                lenSink = Okio.buffer(Okio.sink(new File(lenFile)));
+                //lenSink = Okio.buffer(Okio.sink(new File(lenFile)));
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             }
         }
         //Lg.i(TAG, "frame len =" + h264Data.length);
-        logFrame(h264Data);
+        //logFrame(h264Data);
         try {
             byte[] lenByte = CommUtils.int2bytes(h264Data.length);
-            Lg.i(TAG, "frame len %d -> byteint %d" , h264Data.length, CommUtils.bytes2int(lenByte));
-            lenSink.writeUtf8(String.format("%d,", h264Data.length));
-            if (rowcount++ % 100 == 0) {
-                lenSink.writeUtf8("\n");
-            }
+            //Lg.i(TAG, "frame len %d -> byteint %d" , h264Data.length, CommUtils.bytes2int(lenByte));
+//            lenSink.writeUtf8(String.format("%d,", h264Data.length));
+//            if (rowcount++ % 100 == 0) {
+//                lenSink.writeUtf8("\n");
+//            }
             sink.write(lenByte);
             sink.write(h264Data);
             sink.flush();
