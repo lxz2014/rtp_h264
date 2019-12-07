@@ -13,7 +13,7 @@ import com.lxz.capture_h284.stream.IH264Stream;
 
 public class OpenGLEncoder extends BaseEncoder {
     private static final String TAG = "OpenGLEncoder";
-    private final EGLRender eglRender;
+    private EGLRender eglRender;
     private byte[] pps = null;
     private long current_time;
     private int count = 1;
@@ -22,7 +22,8 @@ public class OpenGLEncoder extends BaseEncoder {
     public OpenGLEncoder(IH264Stream outStream, int screenWidth, int screenHeight) {
         super(outStream, screenWidth, screenHeight);
         avcEncoder = new ScreenAvcEncoder(screenWidth, screenHeight , Config.encodeFps, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
-        eglRender  = new EGLRender(avcEncoder.getSurface(), screenWidth, screenHeight, 15);
+        eglRender = new EGLRender(avcEncoder.getSurface(), screenWidth, screenHeight, 15);
+        eglRender.setup();
     }
 
     private void update() {

@@ -42,7 +42,7 @@ public class EGLRender implements SurfaceTexture.OnFrameAvailableListener {
         initFPs(fps);
         eglSetup(surface);
         makeCurrent();
-        setup();
+        //setup();
     }
 
     private void initFPs(int fps) {
@@ -140,7 +140,10 @@ public class EGLRender implements SurfaceTexture.OnFrameAvailableListener {
     /**
      * Creates interconnected instances of TextureRender, SurfaceTexture, and Surface.
      */
-    private void setup() {
+    public void setup() {
+        if (mTextureRender != null) {
+            return;
+        }
         mTextureRender = new STextureRender(mWidth, mHeight);
         mTextureRender.surfaceCreated();
 
