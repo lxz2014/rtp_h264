@@ -116,7 +116,6 @@ public class PlayMainActivity extends BaseActivity {
                 outputBufferCount = 0;
                 frameCount = 0;
                 startPlayTime = System.currentTimeMillis();
-                decode.flush();
             }
 
             @Override

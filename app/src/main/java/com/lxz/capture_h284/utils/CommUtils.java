@@ -19,7 +19,7 @@ public class CommUtils {
 
     public static void sleep(int i) {
         try {
-            Thread.sleep(i == 0 ? 0 : i);
+            Thread.sleep(i <= 0 ? 0 : i);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
