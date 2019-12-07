@@ -13,6 +13,7 @@ import android.hardware.display.VirtualDisplay;
 import android.media.ImageReader;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
+import android.opengl.GLSurfaceView;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.DisplayMetrics;
@@ -27,6 +28,7 @@ import com.lxz.capture_h284.encode.EncoderUtils;
 import com.lxz.capture_h284.encode.IEncoder;
 import com.lxz.capture_h284.encode.ImageReaderEncoder;
 import com.lxz.capture_h284.encode.ImageReaderEncoder2;
+import com.lxz.capture_h284.encode.OpenGLEncoder;
 import com.lxz.capture_h284.encode.SurfaceEncoder;
 import com.lxz.capture_h284.stream.H264StreamFactory;
 import com.lxz.capture_h284.stream.IH264Stream;
@@ -185,7 +187,7 @@ public class MainActivity extends BaseActivity implements View.OnClickListener {
     private IEncoder encoder;
     private void exeRecord() {
         IH264Stream outputStream = H264StreamFactory.createH264Stream();
-        encoder = new ImageReaderEncoder2(outputStream, screenWidth, screenHeight);//new SurfaceEncoder(debugStream, screenWidth, screenHeight);
+        encoder = new OpenGLEncoder(outputStream, screenWidth, screenHeight);//new SurfaceEncoder(debugStream, screenWidth, screenHeight);
         this.virtualDisplay = this.mediaProjection.createVirtualDisplay(
                 "Recording Display"
                 , screenWidth

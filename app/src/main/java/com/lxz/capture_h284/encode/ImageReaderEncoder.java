@@ -109,9 +109,7 @@ public class ImageReaderEncoder extends BaseEncoder {
 
     @Override
     public void release() {
-        if (avcEncoder != null) {
-            avcEncoder.close();
-        }
+        super.release();
     }
 
     /**

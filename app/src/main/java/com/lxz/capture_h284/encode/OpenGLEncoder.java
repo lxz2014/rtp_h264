@@ -1,5 +1,6 @@
 package com.lxz.capture_h284.encode;
 
+import android.graphics.Bitmap;
 import android.media.MediaCodecInfo;
 import android.view.Surface;
 
@@ -7,24 +8,24 @@ import com.iflytek.log.Lg;
 import com.lxz.capture_h284.Config;
 import com.lxz.capture_h284.OutputBufferInfo;
 import com.lxz.capture_h284.ScreenAvcEncoder;
+import com.lxz.capture_h284.comm.glec.EGLRender;
 import com.lxz.capture_h284.stream.IH264Stream;
 
-public class SurfaceEncoder extends BaseEncoder {
-    private static final String TAG = "SurfaceEncoder";
+public class OpenGLEncoder extends BaseEncoder {
+    private static final String TAG = "OpenGLEncoder";
+    private final EGLRender eglRender;
     private byte[] pps = null;
+    private long current_time;
+    private int count = 1;
+    private long time;
 
-    public SurfaceEncoder(IH264Stream outStream, int screenWidth, int screenHeight) {
+    public OpenGLEncoder(IH264Stream outStream, int screenWidth, int screenHeight) {
         super(outStream, screenWidth, screenHeight);
         avcEncoder = new ScreenAvcEncoder(screenWidth, screenHeight , Config.encodeFps, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
+        eglRender  = new EGLRender(avcEncoder.getSurface(), screenWidth, screenHeight, 15);
     }
 
-    @Override
-    public Surface getSurface() {
-        return avcEncoder.getSurface();
-    }
-
-    @Override
-    public void outputEncodeData() {
+    private void update() {
         OutputBufferInfo outputInfo = avcEncoder.dequeueOutputBuffer();
         while (outputInfo.outputBufferIndex >= 0) {
             byte[] h264Data = avcEncoder.getOutputBuffer(outputInfo.size, outputInfo.outputBufferIndex);
@@ -42,6 +43,29 @@ public class SurfaceEncoder extends BaseEncoder {
                 outStream.writeFrame(h264Data);
             }
             outputInfo = avcEncoder.dequeueOutputBuffer();
+        }
+    }
+
+    @Override
+    public Surface getSurface() {
+        return eglRender.getDecodeSurface();
+    }
+
+    @Override
+    public void outputEncodeData() {
+        eglRender.makeCurrent(1);
+        eglRender.awaitNewImage();
+        current_time = System.currentTimeMillis();
+        if (current_time - time >= eglRender.getVideo_interval()) {
+            Lg.i(TAG, "draw img time %d", (current_time - time));
+            eglRender.drawImage();
+            update();
+            eglRender.setPresentationTime();
+            eglRender.swapBuffers();
+            time = current_time;
+        }
+        else {
+            Lg.i(TAG, "丢弃 ");
         }
     }
 

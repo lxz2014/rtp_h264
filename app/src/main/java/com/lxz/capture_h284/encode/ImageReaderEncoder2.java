@@ -110,9 +110,7 @@ public class ImageReaderEncoder2 extends BaseEncoder{
 
     @Override
     public void release() {
-        if (encoder != null) {
-            encoder.release();
-        }
+        super.release();
     }
 
     /**

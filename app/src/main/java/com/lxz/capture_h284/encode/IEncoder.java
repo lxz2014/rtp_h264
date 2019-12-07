@@ -8,4 +8,6 @@ public interface IEncoder {
     void outputEncodeData();
 
     void release();
+
+    boolean isStopEncode();
 }
